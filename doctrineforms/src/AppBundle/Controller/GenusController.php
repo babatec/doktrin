@@ -5,9 +5,6 @@ namespace AppBundle\Controller;
 use AppBundle\Entity\Genus;
 use AppBundle\Entity\GenusNote;
 use AppBundle\Service\MarkdownTransformer;
-use Doctrine\ORM\EntityManager;
-use AppBundle\Repository\GenusRepository;
-use AppBundle\Repository\GenusNoteRepository;
 use Sensio\Bundle\FrameworkExtraBundle\Configuration\Method;
 use Sensio\Bundle\FrameworkExtraBundle\Configuration\Route;
 use Symfony\Bundle\FrameworkBundle\Controller\Controller;
@@ -17,19 +14,19 @@ use Symfony\Component\HttpFoundation\Response;
 class GenusController extends Controller
 {
     /**
-     * @Route("/genus/new", name="new_genus")
+     * @Route("/genus/new")
      */
     public function newAction()
     {
         $genus = new Genus();
         $genus->setName('Octopus'.rand(1, 100));
+        $genus->setSubFamily('Octopodinae');
         $genus->setSpeciesCount(rand(100, 99999));
-        $genus->setSubFamily('Octopediane');
 
         $genusNote = new GenusNote();
         $genusNote->setUsername('AquaWeaver');
-        $genusNote->setUserAvatarFileName('ryan.jpeg');
-        $genusNote->setNote('I counted 8 legs but I saw 65 legs for some reason. This is crazy!');
+        $genusNote->setUserAvatarFilename('ryan.jpeg');
+        $genusNote->setNote('I counted 8 legs... as they wrapped around me');
         $genusNote->setCreatedAt(new \DateTime('-1 month'));
         $genusNote->setGenus($genus);
 
@@ -38,52 +35,51 @@ class GenusController extends Controller
         $em->persist($genusNote);
         $em->flush();
 
-        return new Response('<html> <body>genus created</body></html>');
+        return new Response('<html><body>Genus created!</body></html>');
     }
-    // route action methods ordering do matter especially when there is a wildcard and card lead to unexpected behaviour
 
     /**
      * @Route("/genus")
      */
     public function listAction()
     {
-        /** @var GenusRepository $em */
         $em = $this->getDoctrine()->getManager();
-        $genuses = $em->getRepository('AppBundle:Genus')->findAllPublishedOrderByRecentlyActive();
-        //dump($em->getRepository('AppBundle:Genus'));
+
+        $genuses = $em->getRepository('AppBundle:Genus')
+            ->findAllPublishedOrderedByRecentlyActive();
+
         return $this->render('genus/list.html.twig', [
-            'genuses' => $genuses,
+            'genuses' => $genuses
         ]);
     }
+
     /**
      * @Route("/genus/{genusName}", name="genus_show")
      */
     public function showAction($genusName)
     {
         $em = $this->getDoctrine()->getManager();
-        /** @var Genus $genus */
-        $genus = $em->getRepository('AppBundle:Genus')->findOneBy(['name' => $genusName]);
 
-        if(!$genus) {
-            throw $this->createNotFountException('no genus found');
+        $genus = $em->getRepository('AppBundle:Genus')
+            ->findOneBy(['name' => $genusName]);
+
+        if (!$genus) {
+            throw $this->createNotFoundException('genus not found');
         }
-        /*
-        $recentNote = $genus->getNotes()->filter(function (GenusNote $note) {
-            return $note->getCreatedAt() > new \DateTime('-3 months');
-        });
-        */
-        $recentNote = $em->getRepository('AppBundle:GenusNote')->findAllRecentNotesForGenus($genus);
 
-        $transformer = $this->get('app.markdown_transformer');
-        $funFact = $transformer->parse($genus->getFunFact());
+        $markdownTransformer = $this->get('app.markdown_transformer');
+        $funFact = $markdownTransformer->parse($genus->getFunFact());
 
         $this->get('logger')
             ->info('Showing genus: '.$genusName);
 
+        $recentNotes = $em->getRepository('AppBundle:GenusNote')
+            ->findAllRecentNotesForGenus($genus);
+
         return $this->render('genus/show.html.twig', array(
             'genus' => $genus,
             'funFact' => $funFact,
-            'recentNoteCount' => count($recentNote)
+            'recentNoteCount' => count($recentNotes)
         ));
     }
 
@@ -91,7 +87,7 @@ class GenusController extends Controller
      * @Route("/genus/{name}/notes", name="genus_show_notes")
      * @Method("GET")
      */
-    public function getNotesAction(Genus $genus) // when you typehint an argument with entity, symfony automatically query for it  - works so long as the wild card has same name as a property on genus
+    public function getNotesAction(Genus $genus)
     {
         $notes = [];
 
@@ -99,11 +95,12 @@ class GenusController extends Controller
             $notes[] = [
                 'id' => $note->getId(),
                 'username' => $note->getUsername(),
-                'avatarUri' => '/images/'. $note->getUserAvatarFileName(),
+                'avatarUri' => '/images/'.$note->getUserAvatarFilename(),
                 'note' => $note->getNote(),
-                'date' => $note->getCreatedAt()->format('Y-m-d')
+                'date' => $note->getCreatedAt()->format('M d, Y')
             ];
         }
+
         $data = [
             'notes' => $notes
         ];
