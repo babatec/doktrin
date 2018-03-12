@@ -35,6 +35,22 @@ class Genus
     private $speciesCount;
 
     /**
+     * @return mixed
+     */
+    public function getId()
+    {
+        return $this->id;
+    }
+
+    /**
+     * @return mixed
+     */
+    public function getisPublished()
+    {
+        return $this->isPublished;
+    }
+
+    /**
      * @ORM\Column(type="string", nullable=true)
      */
     private $funFact;
